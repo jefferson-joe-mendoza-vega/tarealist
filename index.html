@@ -507,9 +507,9 @@
         </div>
 
         <!-- Modal para agregar/editar tarea -->
-        <div id="taskModal" class="modal">
+        <div id="taskModal" class="modal" role="dialog" aria-labelledby="modalTitle" aria-modal="true">
             <div class="modal-content">
-                <button class="close-modal-btn" id="closeModalBtn">&times;</button>
+                <button class="close-modal-btn" id="closeModalBtn" aria-label="Cerrar Modal">&times;</button>
                 <h2 id="modalTitle">Agregar Nueva Tarea</h2>
                 <form id="taskForm">
                     <label for="taskName">Nombre de la tarea:</label>
@@ -519,10 +519,10 @@
                     <input type="date" id="dueDate" required>
 
                     <label for="description">Descripción:</label>
-                    <textarea id="description" required></textarea>
+                    <textarea id="description" placeholder="Opcional"></textarea>
 
                     <label for="taskImage">Imagen de la tarea:</label>
-                    <input type="file" id="taskImage" accept="image/*" required>
+                    <input type="file" id="taskImage" accept="image/*">
                     <img id="imagePreview" class="image-preview" src="" alt="Vista Previa de la Imagen">
 
                     <button type="submit" id="submitBtn">Agregar Tarea</button>
@@ -531,14 +531,16 @@
         </div>
 
         <!-- Modal para mostrar detalles de la tarea -->
-        <div id="detailModal" class="detail-modal">
+        <div id="detailModal" class="detail-modal" role="dialog" aria-labelledby="detailTaskName" aria-modal="true">
             <div class="detail-modal-content">
-                <button class="close-modal-btn" id="closeDetailModalBtn">&times;</button>
+                <button class="close-modal-btn" id="closeDetailModalBtn" aria-label="Cerrar Modal">&times;</button>
                 <h2 id="detailTaskName"></h2>
                 <p><strong>Fecha de vencimiento:</strong> <span id="detailDueDate"></span></p>
-                <p><strong>Descripción:</strong></p>
-                <div id="detailDescription" class="description"></div>
-                <img id="detailImage" src="" alt="Imagen tarea">
+                <div id="detailDescriptionContainer">
+                    <p><strong>Descripción:</strong></p>
+                    <div id="detailDescription" class="description"></div>
+                </div>
+                <img id="detailImage" src="" alt="Imagen tarea" style="display: none;">
                 <button id="closeDetailButton">Cerrar</button>
             </div>
         </div>
@@ -547,7 +549,7 @@
     </div>
 
     <!-- Notificación -->
-    <div id="notification" class="notification"></div>
+    <div id="notification" class="notification" role="alert" aria-live="assertive"></div>
 
     <!-- Importar Firebase como módulos -->
     <script type="module">
@@ -590,6 +592,7 @@
         const detailDueDate = document.getElementById('detailDueDate');
         const detailDescription = document.getElementById('detailDescription');
         const detailImage = document.getElementById('detailImage');
+        const detailDescriptionContainer = document.getElementById('detailDescriptionContainer');
         const notification = document.getElementById('notification');
         const spinnerOverlay = document.getElementById('spinnerOverlay');
         const searchInput = document.getElementById('searchInput');
@@ -601,7 +604,23 @@
         // API Key de ImgBB
         const imgbbAPIKey = '6919281ff26b04eeaa4fc95ae5745889';
 
-        // Función para mostrar notificaciones
+        /**
+         * Obtiene la fecha actual en la zona horaria de Perú (UTC-5).
+         * @returns {Date} - Fecha actual en Perú sin tiempo.
+         */
+        function getCurrentPeruDate() {
+            const now = new Date();
+            const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+            // Perú está en UTC-5
+            const peruTime = new Date(utc - (5 * 60 * 60 * 1000));
+            return new Date(peruTime.getFullYear(), peruTime.getMonth(), peruTime.getDate());
+        }
+
+        /**
+         * Función para mostrar notificaciones
+         * @param {string} message - Mensaje de la notificación
+         * @param {string} type - Tipo de notificación ('success' o 'error')
+         */
         function showNotification(message, type = 'success') {
             notification.textContent = message;
             notification.className = `notification ${type} show`;
@@ -610,7 +629,9 @@
             }, 3000);
         }
 
-        // Función para mostrar el spinner de carga
+        /**
+         * Función para mostrar el spinner de carga
+         */
         function showSpinner() {
             spinnerOverlay.style.display = 'flex';
             document.body.classList.add('loading');
@@ -618,7 +639,9 @@
             disableInteractions(true);
         }
 
-        // Función para ocultar el spinner de carga
+        /**
+         * Función para ocultar el spinner de carga
+         */
         function hideSpinner() {
             spinnerOverlay.style.display = 'none';
             document.body.classList.remove('loading');
@@ -626,7 +649,10 @@
             disableInteractions(false);
         }
 
-        // Función para deshabilitar interacciones durante la carga
+        /**
+         * Función para deshabilitar interacciones durante la carga
+         * @param {boolean} disable - Estado para deshabilitar o habilitar
+         */
         function disableInteractions(disable) {
             const buttons = document.querySelectorAll('button');
             const inputs = document.querySelectorAll('input, textarea');
@@ -638,7 +664,11 @@
             });
         }
 
-        // Función para abrir el modal de agregar/editar tarea
+        /**
+         * Función para abrir el modal de agregar/editar tarea
+         * @param {boolean} isEdit - Indica si es modo edición
+         * @param {object} task - Datos de la tarea a editar
+         */
         function openTaskModal(isEdit = false, task = {}) {
             taskModal.style.display = 'block';
             if (isEdit) {
@@ -646,10 +676,14 @@
                 submitBtn.textContent = 'Actualizar Tarea';
                 taskNameInput.value = task.nombre;
                 dueDateInput.value = task.fecha;
-                descriptionInput.value = task.descripcion;
-                // Mostrar vista previa de la imagen existente
-                imagePreview.src = task.urlImagen;
-                imagePreview.style.display = 'block';
+                descriptionInput.value = task.descripcion || '';
+                // Mostrar vista previa de la imagen existente si está disponible
+                if (task.urlImagen) {
+                    imagePreview.src = task.urlImagen;
+                    imagePreview.style.display = 'block';
+                } else {
+                    imagePreview.style.display = 'none';
+                }
                 taskImageInput.value = ''; // Resetear el input de archivo
                 editMode = true;
                 currentEditTaskId = task.id;
@@ -663,7 +697,9 @@
             }
         }
 
-        // Función para cerrar el modal de agregar/editar tarea
+        /**
+         * Función para cerrar el modal de agregar/editar tarea
+         */
         function closeTaskModal() {
             taskModal.style.display = 'none';
             taskForm.reset();
@@ -672,7 +708,10 @@
             currentEditTaskId = null;
         }
 
-        // Función para abrir el modal de detalles de la tarea
+        /**
+         * Función para abrir el modal de detalles de la tarea
+         * @param {string} taskId - ID de la tarea
+         */
         async function openDetailModal(taskId) {
             showSpinner();
             try {
@@ -682,9 +721,21 @@
                     const task = taskSnap.data();
                     detailTaskName.textContent = task.nombre;
                     detailDueDate.textContent = task.fecha;
-                    detailDescription.innerHTML = parseDescription(task.descripcion);
-                    detailImage.src = task.urlImagen;
-                    detailImage.alt = `Imagen de la tarea: ${task.nombre}`;
+                    
+                    if (task.descripcion) {
+                        detailDescription.innerHTML = parseDescription(task.descripcion);
+                        detailDescriptionContainer.style.display = 'block';
+                    } else {
+                        detailDescriptionContainer.style.display = 'none';
+                    }
+
+                    if (task.urlImagen) {
+                        detailImage.src = task.urlImagen;
+                        detailImage.alt = `Imagen de la tarea: ${task.nombre}`;
+                        detailImage.style.display = 'block';
+                    } else {
+                        detailImage.style.display = 'none';
+                    }
 
                     detailModal.style.display = 'block';
                 } else {
@@ -698,23 +749,33 @@
             }
         }
 
-        // Función para cerrar el modal de detalles
+        /**
+         * Función para cerrar el modal de detalles
+         */
         function closeDetailModalFunc() {
             detailModal.style.display = 'none';
         }
 
-        // Función para calcular los días restantes
+        /**
+         * Función para calcular los días restantes
+         * @param {string} dueDate - Fecha de vencimiento en formato 'YYYY-MM-DD'
+         * @returns {number} - Días restantes
+         */
         function getDaysLeft(dueDate) {
-            const today = new Date();
-            today.setHours(0,0,0,0); // Establecer hora a medianoche para comparación precisa
-            const due = new Date(dueDate);
-            due.setHours(0,0,0,0);
-            const timeDiff = due - today;
+            const currentPeruDate = getCurrentPeruDate();
+            const [year, month, day] = dueDate.split('-').map(Number);
+            const due = new Date(year, month -1, day);
+            // Calcular diferencia en milisegundos
+            const timeDiff = due - currentPeruDate;
             const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
             return daysDiff;
         }
 
-        // Función para obtener el mensaje de días restantes
+        /**
+         * Función para obtener el mensaje de días restantes
+         * @param {number} daysLeft - Días restantes
+         * @returns {string} - Mensaje correspondiente
+         */
         function getDueMessage(daysLeft) {
             if (daysLeft === 1) {
                 return 'Vence mañana';
@@ -727,7 +788,11 @@
             }
         }
 
-        // Función para parsear la descripción y convertir guiones/puntos en listas
+        /**
+         * Función para parsear la descripción y convertir guiones/puntos en listas
+         * @param {string} text - Texto de la descripción
+         * @returns {string} - HTML formateado
+         */
         function parseDescription(text) {
             // Reemplazar líneas que comienzan con '-' o '.' seguidas de espacio por <li>
             const lines = text.split('\n');
@@ -779,7 +844,9 @@
             return html;
         }
 
-        // Mostrar vista previa de la imagen seleccionada
+        /**
+         * Mostrar vista previa de la imagen seleccionada
+         */
         taskImageInput.addEventListener('change', () => {
             const file = taskImageInput.files[0];
             if (file) {
@@ -794,17 +861,23 @@
             }
         });
 
-        // Abrir el modal de agregar tarea
+        /**
+         * Abrir el modal de agregar tarea
+         */
         openModalBtn.addEventListener('click', () => {
             openTaskModal();
         });
 
-        // Cerrar el modal de agregar/editar tarea
+        /**
+         * Cerrar el modal de agregar/editar tarea
+         */
         closeModalBtn.addEventListener('click', () => {
             closeTaskModal();
         });
 
-        // Cerrar el modal de detalles
+        /**
+         * Cerrar el modal de detalles
+         */
         closeDetailModalBtn.addEventListener('click', () => {
             closeDetailModalFunc();
         });
@@ -813,7 +886,11 @@
             closeDetailModalFunc();
         });
 
-        // Función para subir la imagen a ImgBB y obtener la URL
+        /**
+         * Función para subir la imagen a ImgBB y obtener la URL
+         * @param {File} file - Archivo de imagen
+         * @returns {Promise<string>} - URL de la imagen subida
+         */
         async function uploadImageToImgBB(file) {
             const formData = new FormData();
             formData.append('image', file);
@@ -836,7 +913,9 @@
             }
         }
 
-        // Agregar o editar una tarea
+        /**
+         * Agregar o editar una tarea
+         */
         taskForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             showSpinner(); // Mostrar spinner de carga
@@ -846,24 +925,18 @@
             const description = descriptionInput.value.trim();
             const imageFile = taskImageInput.files[0];
 
-            if (!taskName || !dueDate || !description) {
-                showNotification('Por favor, completa todos los campos.', 'error');
-                hideSpinner();
-                return;
-            }
-
-            if (!editMode && !imageFile) {
-                showNotification('Por favor, selecciona una imagen para la tarea.', 'error');
+            // Validación: solo nombre y fecha son obligatorios
+            if (!taskName || !dueDate) {
+                showNotification('Por favor, completa los campos obligatorios.', 'error');
                 hideSpinner();
                 return;
             }
 
             // Validación básica de fecha
-            const today = new Date();
-            today.setHours(0,0,0,0); // Establecer hora a medianoche para comparación precisa
-            const selectedDate = new Date(dueDate);
-            selectedDate.setHours(0,0,0,0);
-            if (selectedDate < today) {
+            const currentPeruDate = getCurrentPeruDate();
+            const [year, month, day] = dueDate.split('-').map(Number);
+            const selectedDate = new Date(year, month -1, day);
+            if (selectedDate < currentPeruDate) {
                 showNotification('La fecha de vencimiento no puede ser anterior a hoy.', 'error');
                 hideSpinner();
                 return;
@@ -877,7 +950,7 @@
                     const taskRef = doc(db, 'tareas', currentEditTaskId);
                     const taskSnap = await getDoc(taskRef);
                     if (taskSnap.exists()) {
-                        imageUrl = taskSnap.data().urlImagen;
+                        imageUrl = taskSnap.data().urlImagen || '';
                     } else {
                         throw new Error('La tarea no existe.');
                     }
@@ -889,7 +962,7 @@
                 const taskData = {
                     nombre: taskName,
                     fecha: dueDate,
-                    descripcion: description,
+                    descripcion: description || '', // Guardar descripción vacía si no hay
                     urlImagen: imageUrl
                 };
 
@@ -910,13 +983,15 @@
                 loadTasks(); // Recargar las tareas
             } catch (error) {
                 console.error('Error al agregar/actualizar tarea:', error);
-                showNotification('Error al agregar/actualizar tarea.', 'error');
+                showNotification(`Error: ${error.message}`, 'error');
             } finally {
                 hideSpinner(); // Ocultar spinner de carga
             }
         });
 
-        // Mostrar todas las tareas ordenadas por fecha y resaltar las urgentes o vencidas
+        /**
+         * Mostrar todas las tareas ordenadas por fecha y resaltar las urgentes o vencidas
+         */
         async function loadTasks() {
             tasksList.innerHTML = '';
             showSpinner();
@@ -947,7 +1022,10 @@
             }
         }
 
-        // Función para renderizar las tareas en el DOM
+        /**
+         * Función para renderizar las tareas en el DOM
+         * @param {Array} tasks - Array de tareas
+         */
         function renderTasks(tasks) {
             tasksList.innerHTML = '';
 
@@ -1008,7 +1086,10 @@
             });
         }
 
-        // Eliminar tarea
+        /**
+         * Eliminar tarea
+         * @param {string} taskId - ID de la tarea a eliminar
+         */
         async function deleteTask(taskId) {
             if (confirm('¿Estás seguro de que deseas eliminar esta tarea?')) {
                 showSpinner();
@@ -1026,7 +1107,10 @@
             }
         }
 
-        // Función para filtrar tareas según el texto de búsqueda
+        /**
+         * Función para filtrar tareas según el texto de búsqueda
+         * @param {string} query - Texto de búsqueda
+         */
         function filterTasks(query) {
             const filtered = allTasks.filter(task => 
                 task.nombre.toLowerCase().includes(query.toLowerCase())
@@ -1034,13 +1118,17 @@
             renderTasks(filtered);
         }
 
-        // Event listener para el buscador
+        /**
+         * Event listener para el buscador
+         */
         searchInput.addEventListener('input', (e) => {
             const query = e.target.value.trim();
             filterTasks(query);
         });
 
-        // Cerrar modales al hacer clic fuera de ellos
+        /**
+         * Cerrar modales al hacer clic fuera de ellos
+         */
         window.addEventListener('click', (e) => {
             if (e.target == taskModal) {
                 closeTaskModal();
@@ -1050,7 +1138,9 @@
             }
         });
 
-        // Cargar las tareas al cargar la página
+        /**
+         * Cargar las tareas al cargar la página
+         */
         window.onload = loadTasks;
     </script>
 </body>
